@@ -45,6 +45,24 @@ def get_output_path_from_config():
 
 
 def line_partitioner(input_string, line_numbers, input_file):
+    # Correct for basic errors such as double spaces or spaces at the start or end of the string
+    line_numbers = ' '.join(line_numbers.split())
+
+    # Checking if line_numbers is empty or contains only spaces
+    if not line_numbers.strip():
+        # Save the input_string as-is to a file with a prefix of 1
+        file_name = os.path.splitext(os.path.basename(input_file))[0]
+        output_path = get_output_path_from_config()
+        output_folder = os.path.join(output_path, file_name)
+        os.makedirs(output_folder, exist_ok=True)
+        output_file = os.path.join(output_folder, f"01_{file_name}.txt")
+        if os.path.exists(output_file):
+            raise FileExistsError(
+                f"Output file '{output_file}' already exists.")
+        with open(output_file, 'w') as out_f:
+            out_f.write(input_string)
+        return
+
     # Convert line_numbers to a list of integers
     line_numbers = list(map(int, line_numbers.split()))
 
@@ -66,8 +84,11 @@ def line_partitioner(input_string, line_numbers, input_file):
         start_line = line_numbers[i-1]
         end_line = line_numbers[i]
 
-        # Create the output file name with integer prefix
-        output_file = os.path.join(output_folder, f"{i}_{file_name}.txt")
+        # Create the output file name with integer prefix, if it is equal to or lesser than 9 we're also prefixing 0 to make sorting easier for later'
+        if i <= 9:
+            output_file = os.path.join(output_folder, f"0{i}_{file_name}.txt")
+        else:
+            output_file = os.path.join(output_folder, f"{i}_{file_name}.txt")
 
         # Check if the output file already exists
         if os.path.exists(output_file):
