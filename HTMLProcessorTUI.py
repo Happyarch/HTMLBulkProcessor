@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import curses
-
 # Function to display file contents and line numbers
 
 
@@ -46,7 +45,8 @@ def draw_text_box(window, text_box_y, text_box_x, textbox_state, numeral_entry_t
 # Function to handle key presses
 
 
-def handle_key(window, key, html_string, start_line, end_line, start_col, numeral_entry_textbox, textbox_state):
+def handle_key(key, platform_key_dict, html_string, start_line, end_line, start_col, numeral_entry_textbox, textbox_state):
+    continue_loop = True
     # Handle key presses for navigation
     if key == curses.KEY_DOWN and end_line < len(html_string.splitlines()):
         start_line += 1
@@ -60,7 +60,7 @@ def handle_key(window, key, html_string, start_line, end_line, start_col, numera
         start_col -= 1
 
     # Handle backspace to delete characters from the entry textbox
-    elif key == curses.KEY_BACKSPACE:
+    elif key == platform_key_dict["UNIVERSAL_BACKSPACE"]:
         numeral_entry_textbox = numeral_entry_textbox[:-1]
 
     # Handle key presses for entering numbers or spaces based on the textbox state
@@ -71,19 +71,26 @@ def handle_key(window, key, html_string, start_line, end_line, start_col, numera
 
     # Handle invalid textbox states
     elif textbox_state not in [0, 1, 2]:  # Only 0, 1, and 2 are valid states
-        print("Error: Invalid textbox state.")
-        return None, None, None, numeral_entry_textbox, False
+        raise ValueError("Error: Invalid textbox state.")
 
-    # Handle Enter key to submit the entry textbox value
-    elif key == curses.KEY_ENTER or key == 10:
-        return None, None, None, numeral_entry_textbox, False
+    # Handle Enter key to submit the entry textbox value, this value is the same across all platforms, but it's also broken for some reason in the curses library so we have to set the keycode with its raw hex number
+    elif key == 10:
+        continue_loop = False
+    return start_line, end_line, start_col, numeral_entry_textbox, continue_loop
 
-    return start_line, end_line, start_col, numeral_entry_textbox, True
-
-# Main function to run the text-based user interface
+# Some logic to bodge curses to work on Windows
 
 
-def run_tui(textbox_state, line_operator_pipeline_stage):
+def windows_workarounds(is_windows):
+    platform_key_dict = {
+        "UNIVERSAL_BACKSPACE": curses.KEY_BACKSPACE if not is_windows else 8,
+    }
+    return platform_key_dict
+
+# Main function to run the curses interface
+
+
+def run_tui(textbox_state, is_windows, line_operator_pipeline_stage):
     def run_curses_interface(stdscr):
         curses.curs_set(0)
         curses.use_default_colors()
@@ -98,7 +105,7 @@ def run_tui(textbox_state, line_operator_pipeline_stage):
         start_col = 0
         text_box_y, text_box_x = stdscr.getmaxyx()[0] - 3, 1
         numeral_entry_textbox = ""
-
+        platform_key_dict = windows_workarounds(is_windows)
         while True:
             stdscr.clear()
             stdscr.border(0)
@@ -110,14 +117,10 @@ def run_tui(textbox_state, line_operator_pipeline_stage):
             stdscr.refresh()
 
             key = stdscr.getch()
-            result = handle_key(stdscr, key, html_string, start_line,
-                                end_line, start_col, numeral_entry_textbox, textbox_state)
-            if result is None:
+            start_line, end_line, start_col, numeral_entry_textbox, continue_loop = handle_key(key, platform_key_dict, html_string, start_line,
+                                                                                               end_line, start_col, numeral_entry_textbox, textbox_state)
+            if not continue_loop:
                 break
-            else:
-                start_line, end_line, start_col, numeral_entry_textbox, continue_loop = result
-                if not continue_loop:
-                    break
 
         # Return the final value of numeral_entry_textbox
         return numeral_entry_textbox
